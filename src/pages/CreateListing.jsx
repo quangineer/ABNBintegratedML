@@ -18,6 +18,8 @@ const CreateListing = () => {
     const [category, setCategory] = useState("")   //empty string because of choosing 1 only
     const [type, setType] = useState("")           //empty string because of choosing 1 only
 
+    /* State for managing the price warning modal */
+    const [showPriceWarning, setShowPriceWarning] = useState(false);
 
     /* LOCATION function */
     const [formLocation, setFormLocation] = useState({
@@ -28,7 +30,7 @@ const CreateListing = () => {
         country: ""
     })
     const handleChangeLocation = (e) => {
-        const {name, value} = e.target
+        const { name, value } = e.target
         setFormLocation({
             ...formLocation,
             [name]: value
@@ -41,18 +43,18 @@ const CreateListing = () => {
     const [bedroomCount, setBedroomCount] = useState(1)
     const [bedCount, setBedCount] = useState(1)
     const [bathroomCount, setBathroomCount] = useState(1)
-    
+
     /* AMENITIES */
     const [amenities, setAmenities] = useState([]) //empty array bacause of being able to choose more than 1
     const handleSelectAmenities = (facility) => {
-        if (amenities.includes(facility)){
+        if (amenities.includes(facility)) {
             setAmenities((prevAmenities) => prevAmenities.filter((option) => option !== facility))
         } else {
-            setAmenities((prev) => [...prev,facility])
+            setAmenities((prev) => [...prev, facility])
         }
     }
     // console.log(amenities)
-    
+
     /* Upload, Drag & Drop, remove photos */
     const [photos, setPhotos] = useState([])
     const handleUploadPhotos = (e) => {
@@ -74,15 +76,15 @@ const CreateListing = () => {
     }
 
     /* Description */
-    const[formDescription, setFormDescription] = useState({
+    const [formDescription, setFormDescription] = useState({
         title: "",
         description: "",
         highlight: "",
         highlightDescription: "",
         price: 0
-    }) 
+    })
     const handleChangeDescription = (e) => {
-        const {name, value} = e.target
+        const { name, value } = e.target
         setFormDescription({
             ...formDescription,
             [name]: value
@@ -96,47 +98,91 @@ const CreateListing = () => {
     // console.log(amenities)
     const navigate = useNavigate()
 
-    const handlePost = async(e) => {
+    /* Setting state for predictedPrice */
+    const [predictedPrice, setPredictedPrice] = useState(null);
+
+    const handlePost = async (e) => {
         e.preventDefault()
 
-        try{
-            /*Create a new FormData object to handle file uploads*/ 
+        try {
+            const response = await fetch("http://localhost:3001/predict/predict-price", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    guestCount,
+                    bedroomCount,
+                    bedCount,
+                    bathroomCount,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to get predicted price");
+            }
+
+            const predictedPrice = await response.json(); // Parse the JSON response
+            setPredictedPrice(predictedPrice); // Update the state variable for predictedPrice
+
+            alert(predictedPrice);
+            // console.log(predictedPrice);
+            alert(formDescription.price < predictedPrice - 100);
+            alert(formDescription.price > predictedPrice + 100);
+            // ... use predictedPrice for comparison or display ...
+            // Validate the price before proceeding
+            if (formDescription.price < predictedPrice - 100 || formDescription.price > predictedPrice + 100) {
+                setShowPriceWarning(true);
+                return;
+            }
+        } catch (error) {
+            console.error("Error fetching predicted price:", error);
+            // Handle error gracefully (e.g., display an error message to the user)
+        }
+
+
+
+        try {
+            /*Create a new FormData object to handle file uploads*/
             const listingForm = new FormData()
-            listingForm.append("creator",creatorId)
-            listingForm.append("category",category)
-            listingForm.append("type",type)
-            listingForm.append("streetAddress",formLocation.streetAddress)
-            listingForm.append("aptSuite",formLocation.aptSuite)
-            listingForm.append("city",formLocation.city)
-            listingForm.append("province",formLocation.province)
-            listingForm.append("country",formLocation.country)
-            listingForm.append("guestCount",guestCount)
-            listingForm.append("bedroomCount",bedroomCount)
-            listingForm.append("bedCount",bedCount)
-            listingForm.append("bathroomCount",bathroomCount)
-            listingForm.append("amenities",amenities)
-            listingForm.append("title",formDescription.title)
-            listingForm.append("description",formDescription.description)
-            listingForm.append("highlight",formDescription.highlight)
-            listingForm.append("highlightDesc",formDescription.highlightDesc)
-            listingForm.append("price",formDescription.price)
+            listingForm.append("creator", creatorId)
+            listingForm.append("category", category)
+            listingForm.append("type", type)
+            listingForm.append("streetAddress", formLocation.streetAddress)
+            listingForm.append("aptSuite", formLocation.aptSuite)
+            listingForm.append("city", formLocation.city)
+            listingForm.append("province", formLocation.province)
+            listingForm.append("country", formLocation.country)
+            listingForm.append("guestCount", guestCount)
+            listingForm.append("bedroomCount", bedroomCount)
+            listingForm.append("bedCount", bedCount)
+            listingForm.append("bathroomCount", bathroomCount)
+            listingForm.append("amenities", amenities)
+            listingForm.append("title", formDescription.title)
+            listingForm.append("description", formDescription.description)
+            listingForm.append("highlight", formDescription.highlight)
+            listingForm.append("highlightDesc", formDescription.highlightDesc)
+            listingForm.append("price", formDescription.price)
             /* append each selected photos to the FormData object */
             photos.forEach((photo) => {
-                listingForm.append("listingPhotos",photo)  //take the photo first, then need to fetch for the path
+                listingForm.append("listingPhotos", photo)  //take the photo first, then need to fetch for the path
             })
             /* Send a POST request to server */
-            const response = await fetch("http://localhost:3001/properties/create",{
-                method:"POST",
-                body:listingForm
+            const response = await fetch("http://localhost:3001/properties/create", {
+                method: "POST",
+                body: listingForm
             })
 
-            if(response.ok){
+            if (response.ok) {
                 navigate("/")
             }
-        } catch(err){
+        } catch (err) {
             console.log("Publish Listing failed", err.message)
         }
     }
+
+    /* Function to close the warning modal */
+    const closePriceWarning = () => {
+        setShowPriceWarning(false);
+    };
 
     return (
         <>
@@ -151,7 +197,7 @@ const CreateListing = () => {
                         <h3>Which of the following best matches your place?</h3>
                         <div className='category-list'>
                             {categories?.map((item, index) => (
-                                <div className={`category ${category === item.label ? "selected" : "" }`} key={index} onClick={() => setCategory(item.label)}>
+                                <div className={`category ${category === item.label ? "selected" : ""}`} key={index} onClick={() => setCategory(item.label)}>
                                     <div className='category_icon'>{item.icon}</div>
                                     <p>{item.label}</p>
                                 </div>
@@ -160,7 +206,7 @@ const CreateListing = () => {
                         <h3>What types of place will our guests have?</h3>
                         <div className='type-list'>
                             {types?.map((item, index) => (
-                                <div className={`type ${type === item.name ? "selected": ""}`} key={index} onClick={() => setType(item.name)}>
+                                <div className={`type ${type === item.name ? "selected" : ""}`} key={index} onClick={() => setType(item.name)}>
                                     <div className='type_text'>
                                         <h4>{item.name}</h4>
                                         <p>{item.description}</p>
@@ -239,7 +285,7 @@ const CreateListing = () => {
                                 <p>Guests</p>
                                 <div className="basic_count">
                                     <RemoveCircleOutline
-                                        onClick={() => {guestCount > 1 && setGuestCount(guestCount -1)}}
+                                        onClick={() => { guestCount > 1 && setGuestCount(guestCount - 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -248,7 +294,7 @@ const CreateListing = () => {
                                     />
                                     <p>{guestCount}</p>
                                     <AddCircleOutline
-                                        onClick={() => {setGuestCount(guestCount +1)}}
+                                        onClick={() => { setGuestCount(guestCount + 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -261,7 +307,7 @@ const CreateListing = () => {
                                 <p>Bedrooms</p>
                                 <div className="basic_count">
                                     <RemoveCircleOutline
-                                        onClick={() => {bedroomCount > 1 && setBedroomCount(bedroomCount -1)}}
+                                        onClick={() => { bedroomCount > 1 && setBedroomCount(bedroomCount - 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -270,7 +316,7 @@ const CreateListing = () => {
                                     />
                                     <p>{bedroomCount}</p>
                                     <AddCircleOutline
-                                        onClick={() => {setBedroomCount(bedroomCount +1)}}
+                                        onClick={() => { setBedroomCount(bedroomCount + 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -283,7 +329,7 @@ const CreateListing = () => {
                                 <p>Beds</p>
                                 <div className="basic_count">
                                     <RemoveCircleOutline
-                                        onClick={() => {bedCount > 1 && setBedCount(bedCount -1)}}
+                                        onClick={() => { bedCount > 1 && setBedCount(bedCount - 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -292,7 +338,7 @@ const CreateListing = () => {
                                     />
                                     <p>{bedCount}</p>
                                     <AddCircleOutline
-                                        onClick={() => {setBedCount(bedCount +1)}}
+                                        onClick={() => { setBedCount(bedCount + 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -305,7 +351,7 @@ const CreateListing = () => {
                                 <p>Bathrooms</p>
                                 <div className="basic_count">
                                     <RemoveCircleOutline
-                                        onClick={() => {bathroomCount > 1 && setBathroomCount(bathroomCount -1)}}
+                                        onClick={() => { bathroomCount > 1 && setBathroomCount(bathroomCount - 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -314,7 +360,7 @@ const CreateListing = () => {
                                     />
                                     <p>{bathroomCount}</p>
                                     <AddCircleOutline
-                                        onClick={() => {setBathroomCount(bathroomCount +1)}}
+                                        onClick={() => { setBathroomCount(bathroomCount + 1) }}
                                         sx={{
                                             fontSize: "25px",
                                             cursor: "pointer",
@@ -383,22 +429,33 @@ const CreateListing = () => {
                         <h3>What makes your house attractive and worth-visiting?</h3>
                         <div className='description'>
                             <p>Title</p>
-                            <input type="text" placeholder='Title' name="title" value={formDescription.title} onChange={handleChangeDescription} required/>
+                            <input type="text" placeholder='Title' name="title" value={formDescription.title} onChange={handleChangeDescription} required />
                             <p>Description</p>
-                            <textarea type="text" placeholder='Description' name="description" value={formDescription.description} onChange={handleChangeDescription} required/>
+                            <textarea type="text" placeholder='Description' name="description" value={formDescription.description} onChange={handleChangeDescription} required />
                             <p>Highlight</p>
-                            <input type="text" placeholder='Highlight' name="highlight" value={formDescription.highlight} onChange={handleChangeDescription} required/>
+                            <input type="text" placeholder='Highlight' name="highlight" value={formDescription.highlight} onChange={handleChangeDescription} required />
                             <p>Highlight Details</p>
-                            <textarea type="text" placeholder='Highlight details' name="highlightDesc" value={formDescription.highlightDesc} onChange={handleChangeDescription} required/>
+                            <textarea type="text" placeholder='Highlight details' name="highlightDesc" value={formDescription.highlightDesc} onChange={handleChangeDescription} required />
                             <p>Now, Set your PRICE:</p>
                             <span>$$$</span>
-                            <input type="number" placeholder='100' name="price" className='price' value={formDescription.price} onChange={handleChangeDescription} required/>
+                            <input type="number" placeholder='100' name="price" className='price' value={formDescription.price} onChange={handleChangeDescription} required />
                         </div>
                     </div>
 
                     <button className='submit_btn' type='submit'>CREATE YOUR LISTING</button>
                 </form>
             </div>
+
+            {/* Warning Modal */}
+            {showPriceWarning && (
+                <div className='modal'>
+                    <div className='modal-content'>
+                        <h3>Invalid Price</h3>
+                        <p>Need-A-Nest suggests our valuable landlord to set your property listing price between ${Math.ceil(predictedPrice-100)} and ${Math.ceil(predictedPrice+100)}. Please enter a valid price.</p>
+                        <button onClick={closePriceWarning}>Close</button>
+                    </div>
+                </div>
+            )}
             <Footer />
         </>
     )
